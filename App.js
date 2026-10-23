@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -52,18 +52,6 @@ const INITIAL_PROPERTIES = [
     image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80',
     agent: 'Emaar Properties Partner',
     description: 'High-floor apartment with full Burj Khalifa and Fountain views. Walking distance to Dubai Mall.'
-  },
-  {
-    id: '3',
-    title: 'Marina Waterfront Penthouse',
-    price: 'AED 8,500,000',
-    location: 'Dubai Marina',
-    beds: '4 Beds',
-    baths: '5 Baths',
-    area: '4,200 sqft',
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80',
-    agent: 'Marina Exclusive Homes',
-    description: 'Stunning penthouse with private terrace jacuzzi, maid room, and full view of Dubai Marina yacht club.'
   }
 ];
 
@@ -73,6 +61,11 @@ export default function App() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [adminModalVisible, setAdminModalVisible] = useState(false);
+  
+  // Admin Authentication State
+  const [session, setSession] = useState(null);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // New Property Form State
   const [newTitle, setNewTitle] = useState('');
@@ -87,6 +80,14 @@ export default function App() {
 
   useEffect(() => {
     fetchProperties();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+      });
+      supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+      });
+    }
   }, []);
 
   const fetchProperties = async () => {
@@ -112,6 +113,38 @@ export default function App() {
     setLoading(false);
   };
 
+  // Handle Admin Login
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      Alert.alert('Error', 'Please enter both Email and Password.');
+      return;
+    }
+    if (supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
+      if (error) {
+        Alert.alert('Login Failed', error.message);
+      } else {
+        Alert.alert('Success', 'Admin logged in successfully!');
+        setLoginEmail('');
+        setLoginPassword('');
+      }
+    } else {
+      Alert.alert('Error', 'Supabase not connected.');
+    }
+  };
+
+  // Handle Logout
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+      setSession(null);
+      Alert.alert('Logged out', 'Admin session ended.');
+    }
+  };
+
   const handleAddProperty = async () => {
     if (!newTitle || !newPrice || !newLocation) {
       Alert.alert('Error', 'Please fill in Title, Price, and Location.');
@@ -127,21 +160,18 @@ export default function App() {
       area: newArea ? `${newArea} sqft` : '1,500 sqft',
       image: newImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1000&q=80',
       agent: newAgent || 'Dubai Real Estate Agent',
-      description: newDescription || 'Premium property available for sale/rent in prime Dubai location.'
+      description: newDescription || 'Premium property available in Dubai.'
     };
 
     if (supabase) {
       const { data, error } = await supabase.from('properties').insert([newProp]).select();
       if (error) {
-        Alert.alert('Notice', 'Added locally (Supabase table pending).');
-        setProperties([ { ...newProp, id: Date.now().toString() }, ...properties ]);
+        Alert.alert('Error', error.message);
       } else if (data) {
         setProperties([ data[0], ...properties ]);
         Alert.alert('Success', 'Property added to live database!');
+        setAdminModalVisible(false);
       }
-    } else {
-      setProperties([ { ...newProp, id: Date.now().toString() }, ...properties ]);
-      Alert.alert('Success', 'Property added to local feed!');
     }
 
     // Reset Form
@@ -154,28 +184,22 @@ export default function App() {
     setNewImage('');
     setNewAgent('');
     setNewDescription('');
-    setAdminModalVisible(false);
   };
 
   const renderItem = ({ item }) => (
     <View style={styles.cardContainer}>
       <Image source={{ uri: item.image }} style={styles.propertyImage} />
-      
-      {/* Overlay Details */}
       <View style={styles.overlay}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{item.price}</Text>
         </View>
-
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.location}>📍 {item.location}</Text>
-
         <View style={styles.specsRow}>
           <Text style={styles.specText}>🛏️ {item.beds}</Text>
           <Text style={styles.specText}>🚿 {item.baths}</Text>
           <Text style={styles.specText}>📐 {item.area}</Text>
         </View>
-
         <TouchableOpacity 
           style={styles.detailsButton} 
           onPress={() => {
@@ -192,19 +216,18 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>PropTok Dubai</Text>
         <TouchableOpacity 
           style={styles.addNavButton}
           onPress={() => setAdminModalVisible(true)}
         >
-          <Text style={styles.addNavButtonText}>+ Add Property</Text>
+          <Text style={styles.addNavButtonText}>
+            {session ? '+ Add Property' : '🔐 Admin Login'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Feed */}
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#FF385C" />
@@ -217,7 +240,7 @@ export default function App() {
           keyExtractor={(item) => item.id.toString()}
           pagingEnabled
           showsVerticalScrollIndicator={false}
-          snapToInterval={height - 70}
+          snapToInterval={height - 50}
           decelerationRate="fast"
         />
       )}
@@ -232,23 +255,18 @@ export default function App() {
                 <Text style={styles.modalPrice}>{selectedProperty.price}</Text>
                 <Text style={styles.modalTitle}>{selectedProperty.title}</Text>
                 <Text style={styles.modalLocation}>📍 {selectedProperty.location}</Text>
-
                 <View style={styles.modalSpecs}>
                   <Text style={styles.modalSpecItem}>🛏️ {selectedProperty.beds}</Text>
                   <Text style={styles.modalSpecItem}>🚿 {selectedProperty.baths}</Text>
                   <Text style={styles.modalSpecItem}>📐 {selectedProperty.area}</Text>
                 </View>
-
                 <Text style={styles.sectionHeading}>Agent Information</Text>
                 <Text style={styles.agentText}>🏢 {selectedProperty.agent}</Text>
-
                 <Text style={styles.sectionHeading}>Description</Text>
                 <Text style={styles.descriptionText}>{selectedProperty.description}</Text>
-
-                <TouchableOpacity style={styles.contactButton} onPress={() => Alert.alert('Contact Agent', 'Agent contact functionality triggered!')}>
-                  <Text style={styles.contactButtonText}>📞 Contact Agent / Inquiry</Text>
+                <TouchableOpacity style={styles.contactButton} onPress={() => Alert.alert('Inquiry', 'Contact feature triggered!')}>
+                  <Text style={styles.contactButtonText}>📞 Contact Agent</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
                   <Text style={styles.closeButtonText}>Close</Text>
                 </TouchableOpacity>
@@ -258,30 +276,52 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Add Property Admin Modal */}
+      {/* Admin Panel / Add Property Modal */}
       <Modal visible={adminModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>Add New Dubai Property</Text>
+              {!session ? (
+                // Login View
+                <>
+                  <Text style={styles.modalTitle}>Admin Secure Login</Text>
+                  <Text style={{ color: '#aaa', marginBottom: 15, fontSize: 13 }}>Only authorized admin can post properties.</Text>
+                  <TextInput style={styles.input} placeholder="Admin Email" placeholderTextColor="#888" value={loginEmail} onChangeText={setLoginEmail} autoCapitalize="none" />
+                  <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#888" secureTextEntry value={loginPassword} onChangeText={setLoginPassword} />
+                  <TouchableOpacity style={styles.submitButton} onPress={handleLogin}>
+                    <Text style={styles.submitButtonText}>Login as Admin</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setAdminModalVisible(false)}>
+                    <Text style={styles.closeButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Add Property Form View
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <Text style={styles.modalTitle}>Add Dubai Property</Text>
+                    <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: '#333', padding: 6, borderRadius: 6 }}>
+                      <Text style={{ color: '#FF385C', fontWeight: 'bold', fontSize: 12 }}>Logout</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput style={styles.input} placeholder="Title (e.g. Marina Luxury Villa)" placeholderTextColor="#888" value={newTitle} onChangeText={setNewTitle} />
+                  <TextInput style={styles.input} placeholder="Price in AED (e.g. 5,000,000)" placeholderTextColor="#888" value={newPrice} onChangeText={setNewPrice} />
+                  <TextInput style={styles.input} placeholder="Location (e.g. Downtown Dubai)" placeholderTextColor="#888" value={newLocation} onChangeText={setNewLocation} />
+                  <TextInput style={styles.input} placeholder="Bedrooms (e.g. 3)" placeholderTextColor="#888" value={newBeds} onChangeText={setNewBeds} />
+                  <TextInput style={styles.input} placeholder="Bathrooms (e.g. 4)" placeholderTextColor="#888" value={newBaths} onChangeText={setNewBaths} />
+                  <TextInput style={styles.input} placeholder="Area sqft (e.g. 2,200)" placeholderTextColor="#888" value={newArea} onChangeText={setNewArea} />
+                  <TextInput style={styles.input} placeholder="Image Direct URL" placeholderTextColor="#888" value={newImage} onChangeText={setNewImage} />
+                  <TextInput style={styles.input} placeholder="Agent / Agency Name" placeholderTextColor="#888" value={newAgent} onChangeText={setNewAgent} />
+                  <TextInput style={[styles.input, { height: 80 }]} multiline placeholder="Full Description" placeholderTextColor="#888" value={newDescription} onChangeText={setNewDescription} />
 
-              <TextInput style={styles.input} placeholder="Title (e.g. Villa in Marina)" placeholderTextColor="#888" value={newTitle} onChangeText={setNewTitle} />
-              <TextInput style={styles.input} placeholder="Price in AED (e.g. 5,000,000)" placeholderTextColor="#888" value={newPrice} onChangeText={setNewPrice} />
-              <TextInput style={styles.input} placeholder="Location (e.g. Business Bay)" placeholderTextColor="#888" value={newLocation} onChangeText={setNewLocation} />
-              <TextInput style={styles.input} placeholder="Bedrooms (e.g. 3)" placeholderTextColor="#888" value={newBeds} onChangeText={setNewBeds} />
-              <TextInput style={styles.input} placeholder="Bathrooms (e.g. 4)" placeholderTextColor="#888" value={newBaths} onChangeText={setNewBaths} />
-              <TextInput style={styles.input} placeholder="Area sqft (e.g. 2,200)" placeholderTextColor="#888" value={newArea} onChangeText={setNewArea} />
-              <TextInput style={styles.input} placeholder="Image Direct URL" placeholderTextColor="#888" value={newImage} onChangeText={setNewImage} />
-              <TextInput style={styles.input} placeholder="Agent / Agency Name" placeholderTextColor="#888" value={newAgent} onChangeText={setNewAgent} />
-              <TextInput style={[styles.input, { height: 80 }]} multiline placeholder="Full Description" placeholderTextColor="#888" value={newDescription} onChangeText={setNewDescription} />
-
-              <TouchableOpacity style={styles.submitButton} onPress={handleAddProperty}>
-                <Text style={styles.submitButtonText}>Publish Property</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.closeButton} onPress={() => setAdminModalVisible(false)}>
-                <Text style={styles.closeButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={styles.submitButton} onPress={handleAddProperty}>
+                    <Text style={styles.submitButtonText}>Publish to Live Database</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setAdminModalVisible(false)}>
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -306,7 +346,7 @@ const styles = StyleSheet.create({
   addNavButton: { backgroundColor: '#FF385C', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
   addNavButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  cardContainer: { width: width, height: height - 70, justifyContent: 'flex-end' },
+  cardContainer: { width: width, height: height - 50, justifyContent: 'flex-end' },
   propertyImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   overlay: { padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   badge: { backgroundColor: '#FF385C', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 15, marginBottom: 8 },
