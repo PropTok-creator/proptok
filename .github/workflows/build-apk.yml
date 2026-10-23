@@ -19,5 +19,15 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Verify Expo Build Setup
-        run: npx expo -v
+      - name: Build Android App Bundle / APK Preview
+        run: |
+          npx expo prebuild --platform android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: PropTok-App
+          path: android/app/build/outputs/apk/release/app-release.apk
