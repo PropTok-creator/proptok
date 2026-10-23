@@ -12,24 +12,28 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Build Android App Bundle / APK Preview
+      - name: Clean Old Android Assets & Prebuild
         run: |
-          npx expo prebuild --platform android --clean
+          rm -rf android
+          npx expo prebuild --platform android
+
+      - name: Build APK
+        run: |
           cd android
           ./gradlew assembleRelease
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: PropTok-APK
           path: android/app/build/outputs/apk/release/app-release.apk
