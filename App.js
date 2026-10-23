@@ -1,64 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  SafeAreaView,
-  TouchableOpacity,
   Dimensions,
   FlatList,
   Image,
-  StatusBar,
+  TouchableOpacity,
   Modal,
   TextInput,
   ScrollView,
-  Alert
+  SafeAreaView,
+  ActivityIndicator,
+  Alert,
+  StatusBar
 } from 'react-native';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase Connection using GitHub Secrets
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 
 const { width, height } = Dimensions.get('window');
 
-// Initial Mock Data
+// Default sample data for Dubai properties
 const INITIAL_PROPERTIES = [
   {
     id: '1',
-    title: '3 Bed Luxury Apartment in DHA Phase 6',
-    price: 'PKR 3.5 Crore',
-    location: 'Karachi, Pakistan',
-    beds: '3',
-    baths: '3',
-    area: '2000 Sqft',
-    agent: 'PropTok Platinum Agent',
-    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-    likes: 1200,
-    comments: 45,
-    description: 'Beautiful luxury apartment with sea view, spacious bedrooms, and modern fittings in the heart of DHA Phase 6.',
-    phone: '+92 300 1234567'
+    title: 'Luxury Villa in Palm Jumeirah',
+    price: 'AED 15,000,000',
+    location: 'Palm Jumeirah, Dubai',
+    beds: '5 Beds',
+    baths: '6 Baths',
+    area: '7,500 sqft',
+    image: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1000&q=80',
+    agent: 'Dubai Luxury Real Estate',
+    description: 'Exclusive beachfront villa with private pool, panoramic sea views, and ultra-modern finishings in Palm Jumeirah.'
   },
   {
     id: '2',
-    title: 'Modern Villa with Private Pool',
-    price: 'PKR 8.2 Crore',
-    location: 'Gulberg, Lahore',
-    beds: '5',
-    baths: '6',
-    area: '4500 Sqft',
-    agent: 'Estate Masters',
-    image: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80',
-    likes: 3400,
-    comments: 120,
-    description: 'Designer villa with private swimming pool, basement theater, and Italian kitchen.',
-    phone: '+92 321 7654321'
+    title: 'Downtown Modern Apartment',
+    price: 'AED 3,200,000',
+    location: 'Downtown Dubai',
+    beds: '2 Beds',
+    baths: '3 Baths',
+    area: '1,450 sqft',
+    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80',
+    agent: 'Emaar Properties Partner',
+    description: 'High-floor apartment with full Burj Khalifa and Fountain views. Walking distance to Dubai Mall.'
+  },
+  {
+    id: '3',
+    title: 'Marina Waterfront Penthouse',
+    price: 'AED 8,500,000',
+    location: 'Dubai Marina',
+    beds: '4 Beds',
+    baths: '5 Baths',
+    area: '4,200 sqft',
+    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80',
+    agent: 'Marina Exclusive Homes',
+    description: 'Stunning penthouse with private terrace jacuzzi, maid room, and full view of Dubai Marina yacht club.'
   }
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('Home');
-  const [properties, setProperties] = useState(INITIAL_PROPERTIES);
+  const [properties, setProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedProperty, setSelectedProperty] = useState(null);
-  const [likedItems, setLikedItems] = useState({});
-  const [savedItems, setSavedItems] = useState({});
+  const [modalVisible, setModalVisible] = useState(false);
+  const [adminModalVisible, setAdminModalVisible] = useState(false);
 
-  // Form State for Adding Property
+  // New Property Form State
   const [newTitle, setNewTitle] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newLocation, setNewLocation] = useState('');
@@ -66,51 +82,69 @@ export default function App() {
   const [newBaths, setNewBaths] = useState('');
   const [newArea, setNewArea] = useState('');
   const [newImage, setNewImage] = useState('');
+  const [newAgent, setNewAgent] = useState('');
+  const [newDescription, setNewDescription] = useState('');
 
-  // Handle Like Button Toggle
-  const toggleLike = (id) => {
-    setLikedItems(prev => ({ ...prev, [id]: !prev[id] }));
-    setProperties(prev => prev.map(p => {
-      if (p.id === id) {
-        return { ...p, likes: likedItems[id] ? p.likes - 1 : p.likes + 1 };
+  useEffect(() => {
+    fetchProperties();
+  }, []);
+
+  const fetchProperties = async () => {
+    setLoading(true);
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('properties')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error || !data || data.length === 0) {
+          setProperties(INITIAL_PROPERTIES);
+        } else {
+          setProperties(data);
+        }
+      } catch (e) {
+        setProperties(INITIAL_PROPERTIES);
       }
-      return p;
-    }));
+    } else {
+      setProperties(INITIAL_PROPERTIES);
+    }
+    setLoading(false);
   };
 
-  // Handle Save Property Toggle
-  const toggleSave = (id) => {
-    setSavedItems(prev => ({ ...prev, [id]: !prev[id] }));
-    Alert.alert("PropTok", savedItems[id] ? "Removed from Saved" : "Property Saved Successfully!");
-  };
-
-  // Add New Property (Admin Mode)
-  const handleAddProperty = () => {
+  const handleAddProperty = async () => {
     if (!newTitle || !newPrice || !newLocation) {
-      Alert.alert("Error", "Please fill in Title, Price, and Location!");
+      Alert.alert('Error', 'Please fill in Title, Price, and Location.');
       return;
     }
 
-    const newEntry = {
-      id: Date.now().toString(),
+    const newProp = {
       title: newTitle,
-      price: newPrice,
+      price: newPrice.includes('AED') ? newPrice : `AED ${newPrice}`,
       location: newLocation,
-      beds: newBeds || '3',
-      baths: newBaths || '3',
-      area: newArea || '1000 Sqft',
-      agent: 'Admin Upload',
-      image: newImage || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80',
-      likes: 0,
-      comments: 0,
-      description: 'Newly added property listed via PropTok Admin Panel.',
-      phone: '+92 300 0000000'
+      beds: newBeds ? `${newBeds} Beds` : '3 Beds',
+      baths: newBaths ? `${newBaths} Baths` : '3 Baths',
+      area: newArea ? `${newArea} sqft` : '1,500 sqft',
+      image: newImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1000&q=80',
+      agent: newAgent || 'Dubai Real Estate Agent',
+      description: newDescription || 'Premium property available for sale/rent in prime Dubai location.'
     };
 
-    setProperties([newEntry, ...properties]);
-    Alert.alert("Success", "New Property Added to Feed!");
-    
-    // Clear Form
+    if (supabase) {
+      const { data, error } = await supabase.from('properties').insert([newProp]).select();
+      if (error) {
+        Alert.alert('Notice', 'Added locally (Supabase table pending).');
+        setProperties([ { ...newProp, id: Date.now().toString() }, ...properties ]);
+      } else if (data) {
+        setProperties([ data[0], ...properties ]);
+        Alert.alert('Success', 'Property added to live database!');
+      }
+    } else {
+      setProperties([ { ...newProp, id: Date.now().toString() }, ...properties ]);
+      Alert.alert('Success', 'Property added to local feed!');
+    }
+
+    // Reset Form
     setNewTitle('');
     setNewPrice('');
     setNewLocation('');
@@ -118,58 +152,36 @@ export default function App() {
     setNewBaths('');
     setNewArea('');
     setNewImage('');
-    
-    setActiveTab('Home');
+    setNewAgent('');
+    setNewDescription('');
+    setAdminModalVisible(false);
   };
 
-  // Render Card for Feed
-  const renderPropertyCard = ({ item }) => (
+  const renderItem = ({ item }) => (
     <View style={styles.cardContainer}>
       <Image source={{ uri: item.image }} style={styles.propertyImage} />
-      <View style={styles.overlay} />
-
-      {/* Action Buttons (Right Side) */}
-      <View style={styles.rightBar}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => toggleLike(item.id)}>
-          <Text style={styles.actionIcon}>{likedItems[item.id] ? '❤️' : '🤍'}</Text>
-          <Text style={styles.actionText}>{item.likes}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => setSelectedProperty(item)}>
-          <Text style={styles.actionIcon}>💬</Text>
-          <Text style={styles.actionText}>{item.comments}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => toggleSave(item.id)}>
-          <Text style={styles.actionIcon}>{savedItems[item.id] ? '🔖' : '📑'}</Text>
-          <Text style={styles.actionText}>{savedItems[item.id] ? 'Saved' : 'Save'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => Alert.alert("WhatsApp Chat", `Connecting to agent at ${item.phone}`)}>
-          <Text style={styles.actionIcon}>📞</Text>
-          <Text style={styles.actionText}>Call</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Property Information overlay */}
-      <View style={styles.bottomInfo}>
+      
+      {/* Overlay Details */}
+      <View style={styles.overlay}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{item.agent}</Text>
+          <Text style={styles.badgeText}>{item.price}</Text>
         </View>
 
-        <Text style={styles.price}>{item.price}</Text>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.location}>📍 {item.location}</Text>
 
-        <View style={styles.featuresRow}>
-          <Text style={styles.featureChip}>🛏️ {item.beds} Beds</Text>
-          <Text style={styles.featureChip}>🚿 {item.baths} Baths</Text>
-          <Text style={styles.featureChip}>📐 {item.area}</Text>
+        <View style={styles.specsRow}>
+          <Text style={styles.specText}>🛏️ {item.beds}</Text>
+          <Text style={styles.specText}>🚿 {item.baths}</Text>
+          <Text style={styles.specText}>📐 {item.area}</Text>
         </View>
 
         <TouchableOpacity 
-          style={styles.detailsButton}
-          onPress={() => setSelectedProperty(item)}
+          style={styles.detailsButton} 
+          onPress={() => {
+            setSelectedProperty(item);
+            setModalVisible(true);
+          }}
         >
           <Text style={styles.detailsButtonText}>View Full Details</Text>
         </TouchableOpacity>
@@ -179,176 +191,101 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-
-      {/* TOP HEADER */}
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>PropTok</Text>
-        <View style={styles.topTabs}>
-          <Text style={[styles.topTabText, styles.activeTopTab]}>For You</Text>
-          <Text style={styles.topTabText}>Following</Text>
-        </View>
+        <Text style={styles.headerTitle}>PropTok Dubai</Text>
+        <TouchableOpacity 
+          style={styles.addNavButton}
+          onPress={() => setAdminModalVisible(true)}
+        >
+          <Text style={styles.addNavButtonText}>+ Add Property</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* SCREEN NAVIGATION CONTENT */}
-      {activeTab === 'Home' && (
+      {/* Feed */}
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#FF385C" />
+          <Text style={{ color: '#fff', marginTop: 10 }}>Loading Dubai Properties...</Text>
+        </View>
+      ) : (
         <FlatList
           data={properties}
-          renderItem={renderPropertyCard}
-          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
           pagingEnabled
           showsVerticalScrollIndicator={false}
+          snapToInterval={height - 70}
           decelerationRate="fast"
-          snapToInterval={height - 110}
-          snapToAlignment="start"
         />
       )}
 
-      {activeTab === 'Search' && (
-        <View style={styles.screenView}>
-          <Text style={styles.screenHeader}>Search Properties</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Search by Location, City, or Title..." 
-            placeholderTextColor="#888" 
-          />
-          <View style={styles.filterContainer}>
-            <Text style={styles.filterTitle}>Quick Filters:</Text>
-            <View style={styles.featuresRow}>
-              <Text style={styles.featureChip}>Karachi</Text>
-              <Text style={styles.featureChip}>Lahore</Text>
-              <Text style={styles.featureChip}>Islamabad</Text>
-              <Text style={styles.featureChip}>Apartments</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {activeTab === 'Add' && (
-        <ScrollView style={styles.screenView}>
-          <Text style={styles.screenHeader}>Add New Property (Admin)</Text>
-          
-          <TextInput 
-            style={styles.input} 
-            placeholder="Property Title (e.g., 3 Bed Flat)" 
-            placeholderTextColor="#888" 
-            value={newTitle}
-            onChangeText={setNewTitle}
-          />
-          <TextInput 
-            style={styles.input} 
-            placeholder="Price (e.g., PKR 2.5 Crore)" 
-            placeholderTextColor="#888" 
-            value={newPrice}
-            onChangeText={setNewPrice}
-          />
-          <TextInput 
-            style={styles.input} 
-            placeholder="Location (e.g., Clifton, Karachi)" 
-            placeholderTextColor="#888" 
-            value={newLocation}
-            onChangeText={setNewLocation}
-          />
-          <View style={{flexDirection: 'row', gap: 10}}>
-            <TextInput 
-              style={[styles.input, {flex: 1}]} 
-              placeholder="Beds" 
-              placeholderTextColor="#888" 
-              value={newBeds}
-              onChangeText={setNewBeds}
-            />
-            <TextInput 
-              style={[styles.input, {flex: 1}]} 
-              placeholder="Baths" 
-              placeholderTextColor="#888" 
-              value={newBaths}
-              onChangeText={setNewBaths}
-            />
-          </View>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Image URL (Optional)" 
-            placeholderTextColor="#888" 
-            value={newImage}
-            onChangeText={setNewImage}
-          />
-
-          <TouchableOpacity style={styles.submitBtn} onPress={handleAddProperty}>
-            <Text style={styles.submitBtnText}>Publish Property</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-
-      {activeTab === 'Saved' && (
-        <View style={styles.screenView}>
-          <Text style={styles.screenHeader}>Saved Properties</Text>
-          <Text style={{color: '#aaa', marginTop: 10}}>
-            {Object.keys(savedItems).length > 0 ? "You have saved items in your list." : "No saved properties yet."}
-          </Text>
-        </View>
-      )}
-
-      {activeTab === 'Profile' && (
-        <View style={styles.screenView}>
-          <Text style={styles.screenHeader}>Admin Profile</Text>
-          <View style={styles.profileCard}>
-            <Text style={{color: '#fff', fontSize: 18, fontWeight: 'bold'}}>PropTok Super Admin</Text>
-            <Text style={{color: '#007aff', marginTop: 5}}>admin@proptok.com</Text>
-            <Text style={{color: '#aaa', marginTop: 15}}>Total Listed Properties: {properties.length}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* FULL DETAILS MODAL */}
-      <Modal visible={selectedProperty !== null} animationType="slide" transparent={true}>
-        <View style={styles.modalContainer}>
+      {/* Property Details Modal */}
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {selectedProperty && (
-              <>
-                <Text style={styles.modalTitle}>{selectedProperty.title}</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image source={{ uri: selectedProperty.image }} style={styles.modalImage} />
                 <Text style={styles.modalPrice}>{selectedProperty.price}</Text>
-                <Text style={{color: '#ccc', marginVertical: 5}}>📍 {selectedProperty.location}</Text>
-                <Text style={styles.modalDesc}>{selectedProperty.description}</Text>
-                <Text style={{color: '#007aff', fontWeight: 'bold', marginVertical: 10}}>Contact Agent: {selectedProperty.phone}</Text>
+                <Text style={styles.modalTitle}>{selectedProperty.title}</Text>
+                <Text style={styles.modalLocation}>📍 {selectedProperty.location}</Text>
 
-                <TouchableOpacity 
-                  style={styles.closeBtn} 
-                  onPress={() => setSelectedProperty(null)}
-                >
-                  <Text style={{color: '#fff', fontWeight: 'bold'}}>Close Details</Text>
+                <View style={styles.modalSpecs}>
+                  <Text style={styles.modalSpecItem}>🛏️ {selectedProperty.beds}</Text>
+                  <Text style={styles.modalSpecItem}>🚿 {selectedProperty.baths}</Text>
+                  <Text style={styles.modalSpecItem}>📐 {selectedProperty.area}</Text>
+                </View>
+
+                <Text style={styles.sectionHeading}>Agent Information</Text>
+                <Text style={styles.agentText}>🏢 {selectedProperty.agent}</Text>
+
+                <Text style={styles.sectionHeading}>Description</Text>
+                <Text style={styles.descriptionText}>{selectedProperty.description}</Text>
+
+                <TouchableOpacity style={styles.contactButton} onPress={() => Alert.alert('Contact Agent', 'Agent contact functionality triggered!')}>
+                  <Text style={styles.contactButtonText}>📞 Contact Agent / Inquiry</Text>
                 </TouchableOpacity>
-              </>
+
+                <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </ScrollView>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* BOTTOM NAVIGATION BAR */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity onPress={() => setActiveTab('Home')}>
-          <Text style={[styles.navIcon, activeTab === 'Home' && styles.activeNav]}>🏠</Text>
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
+      {/* Add Property Admin Modal */}
+      <Modal visible={adminModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Add New Dubai Property</Text>
 
-        <TouchableOpacity onPress={() => setActiveTab('Search')}>
-          <Text style={[styles.navIcon, activeTab === 'Search' && styles.activeNav]}>🔍</Text>
-          <Text style={styles.navLabel}>Search</Text>
-        </TouchableOpacity>
+              <TextInput style={styles.input} placeholder="Title (e.g. Villa in Marina)" placeholderTextColor="#888" value={newTitle} onChangeText={setNewTitle} />
+              <TextInput style={styles.input} placeholder="Price in AED (e.g. 5,000,000)" placeholderTextColor="#888" value={newPrice} onChangeText={setNewPrice} />
+              <TextInput style={styles.input} placeholder="Location (e.g. Business Bay)" placeholderTextColor="#888" value={newLocation} onChangeText={setNewLocation} />
+              <TextInput style={styles.input} placeholder="Bedrooms (e.g. 3)" placeholderTextColor="#888" value={newBeds} onChangeText={setNewBeds} />
+              <TextInput style={styles.input} placeholder="Bathrooms (e.g. 4)" placeholderTextColor="#888" value={newBaths} onChangeText={setNewBaths} />
+              <TextInput style={styles.input} placeholder="Area sqft (e.g. 2,200)" placeholderTextColor="#888" value={newArea} onChangeText={setNewArea} />
+              <TextInput style={styles.input} placeholder="Image Direct URL" placeholderTextColor="#888" value={newImage} onChangeText={setNewImage} />
+              <TextInput style={styles.input} placeholder="Agent / Agency Name" placeholderTextColor="#888" value={newAgent} onChangeText={setNewAgent} />
+              <TextInput style={[styles.input, { height: 80 }]} multiline placeholder="Full Description" placeholderTextColor="#888" value={newDescription} onChangeText={setNewDescription} />
 
-        <TouchableOpacity style={styles.addPropertyBtn} onPress={() => setActiveTab('Add')}>
-          <Text style={styles.addPropertyText}>+</Text>
-        </TouchableOpacity>
+              <TouchableOpacity style={styles.submitButton} onPress={handleAddProperty}>
+                <Text style={styles.submitButtonText}>Publish Property</Text>
+              </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setActiveTab('Saved')}>
-          <Text style={[styles.navIcon, activeTab === 'Saved' && styles.activeNav]}>🔖</Text>
-          <Text style={styles.navLabel}>Saved</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setActiveTab('Profile')}>
-          <Text style={[styles.navIcon, activeTab === 'Profile' && styles.activeNav]}>👤</Text>
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setAdminModalVisible(false)}>
+                <Text style={styles.closeButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -356,55 +293,46 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: {
-    position: 'absolute', top: 40, left: 0, right: 0, zIndex: 10,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20,
+    height: 50,
+    backgroundColor: '#121212',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222'
   },
-  headerTitle: { color: '#007aff', fontSize: 22, fontWeight: 'bold' },
-  topTabs: { flexDirection: 'row', gap: 15 },
-  topTabText: { color: '#888', fontSize: 16, fontWeight: '600' },
-  activeTopTab: { color: '#fff', borderBottomWidth: 2, borderBottomColor: '#007aff' },
-  
-  cardContainer: { width: width, height: height - 110, justifyContent: 'flex-end' },
-  propertyImage: { ...StyleSheet.absoluteFillObject, width: width, height: '100%', resizeMode: 'cover' },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
-  
-  rightBar: { position: 'absolute', right: 15, bottom: 120, alignItems: 'center', gap: 18 },
-  actionButton: { alignItems: 'center' },
-  actionIcon: { fontSize: 28 },
-  actionText: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginTop: 2 },
-  
-  bottomInfo: { padding: 20, paddingBottom: 30, width: width - 80 },
-  badge: { backgroundColor: '#007aff', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, marginBottom: 8 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  price: { color: '#4cd964', fontSize: 24, fontWeight: 'bold' },
-  title: { color: '#fff', fontSize: 18, fontWeight: '600', marginVertical: 4 },
-  location: { color: '#ccc', fontSize: 14 },
-  featuresRow: { flexDirection: 'row', gap: 8, marginVertical: 10 },
-  featureChip: { backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontSize: 12 },
-  detailsButton: { backgroundColor: '#007aff', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 5 },
-  detailsButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-
-  screenView: { flex: 1, marginTop: 90, paddingHorizontal: 20 },
-  screenHeader: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
-  input: { backgroundColor: '#111', color: '#fff', borderColor: '#333', borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 12 },
-  submitBtn: { backgroundColor: '#007aff', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  
-  filterContainer: { marginTop: 20 },
-  filterTitle: { color: '#aaa', marginBottom: 10 },
-  profileCard: { backgroundColor: '#111', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: '#333' },
-
-  modalContainer: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
-  modalContent: { backgroundColor: '#1c1c1e', padding: 25, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  modalPrice: { color: '#4cd964', fontSize: 22, fontWeight: 'bold', marginVertical: 5 },
-  modalDesc: { color: '#aaa', marginVertical: 10, lineHeight: 20 },
-  closeBtn: { backgroundColor: '#007aff', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 },
-
-  bottomNav: { height: 60, backgroundColor: '#111', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#333' },
-  navIcon: { fontSize: 20, textAlign: 'center', opacity: 0.6 },
-  activeNav: { opacity: 1 },
-  navLabel: { color: '#fff', fontSize: 10, marginTop: 2, textAlign: 'center' },
-  addPropertyBtn: { backgroundColor: '#007aff', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  addPropertyText: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginTop: -2 },
+  headerTitle: { color: '#FF385C', fontSize: 20, fontWeight: 'bold' },
+  addNavButton: { backgroundColor: '#FF385C', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
+  addNavButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  cardContainer: { width: width, height: height - 70, justifyContent: 'flex-end' },
+  propertyImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  overlay: { padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  badge: { backgroundColor: '#FF385C', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 15, marginBottom: 8 },
+  badgeText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  title: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
+  location: { color: '#ddd', fontSize: 14, marginBottom: 10 },
+  specsRow: { flexDirection: 'row', gap: 15, marginBottom: 15 },
+  specText: { color: '#fff', fontSize: 14, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  detailsButton: { backgroundColor: '#fff', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  detailsButtonText: { color: '#000', fontWeight: 'bold', fontSize: 15 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, maxHeight: height * 0.85 },
+  modalImage: { width: '100%', height: 220, borderRadius: 15, marginBottom: 15 },
+  modalPrice: { color: '#FF385C', fontSize: 24, fontWeight: 'bold' },
+  modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginVertical: 5 },
+  modalLocation: { color: '#aaa', fontSize: 14, marginBottom: 15 },
+  modalSpecs: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#2A2A2A', padding: 12, borderRadius: 10, marginBottom: 15 },
+  modalSpecItem: { color: '#fff', fontWeight: '600' },
+  sectionHeading: { color: '#FF385C', fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 5 },
+  agentText: { color: '#fff', fontSize: 15, marginBottom: 10 },
+  descriptionText: { color: '#ccc', fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  contactButton: { backgroundColor: '#25D366', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+  contactButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  closeButton: { backgroundColor: '#333', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  closeButtonText: { color: '#fff', fontWeight: 'bold' },
+  input: { backgroundColor: '#2A2A2A', color: '#fff', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 14 },
+  submitButton: { backgroundColor: '#FF385C', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+  submitButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });
