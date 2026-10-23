@@ -1,14 +1,175 @@
-import React from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
+  FlatList,
+  Image,
+  StatusBar,
+  Alert
+} from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+// Mock Data for Property Feed
+const PROPERTIES = [
+  {
+    id: '1',
+    title: '3 Bed Luxury Apartment in DHA Phase 6',
+    price: 'PKR 3.5 Crore',
+    location: 'Karachi, Pakistan',
+    beds: '3',
+    baths: '3',
+    area: '2000 Sqft',
+    agent: 'PropTok Platinum Agent',
+    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+    likes: '1.2K',
+    comments: '45'
+  },
+  {
+    id: '2',
+    title: 'Modern Villa with Private Pool',
+    price: 'PKR 8.2 Crore',
+    location: 'Gulberg, Lahore',
+    beds: '5',
+    baths: '6',
+    area: '4500 Sqft',
+    agent: 'Estate Masters',
+    image: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80',
+    likes: '3.4K',
+    comments: '120'
+  },
+  {
+    id: '3',
+    title: 'Commercial Plot in Prime Business Bay',
+    price: 'PKR 12.0 Crore',
+    location: 'Islamabad, F-7',
+    beds: '0',
+    baths: '0',
+    area: '1000 Sqyd',
+    agent: 'Capital Realtors',
+    image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
+    likes: '890',
+    comments: '18'
+  }
+];
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState('Home');
+
+  const handleAction = (type, title) => {
+    Alert.alert(type, `${type} clicked for: ${title}`);
+  };
+
+  const renderPropertyCard = ({ item }) => (
+    <View style={styles.cardContainer}>
+      <Image source={{ uri: item.image }} style={styles.propertyImage} />
+      
+      {/* Dark Overlay for Text Visibility */}
+      <View style={styles.overlay} />
+
+      {/* Right Action Bar (TikTok Style) */}
+      <View style={styles.rightBar}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleAction('Like', item.title)}>
+          <Text style={styles.actionIcon}>❤️</Text>
+          <Text style={styles.actionText}>{item.likes}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleAction('Comments', item.title)}>
+          <Text style={styles.actionIcon}>💬</Text>
+          <Text style={styles.actionText}>{item.comments}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleAction('WhatsApp', item.title)}>
+          <Text style={styles.actionIcon}>💬</Text>
+          <Text style={styles.actionText}>Chat</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleAction('Call', item.title)}>
+          <Text style={styles.actionIcon}>📞</Text>
+          <Text style={styles.actionText}>Call</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Bottom Property Info */}
+      <View style={styles.bottomInfo}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{item.agent}</Text>
+        </View>
+
+        <Text style={styles.price}>{item.price}</Text>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.location}>📍 {item.location}</Text>
+
+        {/* Features Chips */}
+        <View style={styles.featuresRow}>
+          {item.beds !== '0' && <Text style={styles.featureChip}>🛏️ {item.beds} Beds</Text>}
+          {item.baths !== '0' && <Text style={styles.featureChip}>🚿 {item.baths} Baths</Text>}
+          <Text style={styles.featureChip}>📐 {item.area}</Text>
+        </View>
+
+        <TouchableOpacity 
+          style={styles.detailsButton}
+          onPress={() => handleAction('Details View', item.title)}
+        >
+          <Text style={styles.detailsButtonText}>View Full Details</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>PropTok Real Estate</Text>
-        <Text style={styles.subtitle}>RERA Approved Property</Text>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Book Consultation</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      
+      {/* Top Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>PropTok</Text>
+        <View style={styles.topTabs}>
+          <Text style={[styles.topTabText, styles.activeTopTab]}>For You</Text>
+          <Text style={styles.topTabText}>Following</Text>
+        </View>
+      </View>
+
+      {/* TikTok Style Vertical Feed */}
+      <FlatList
+        data={PROPERTIES}
+        renderItem={renderPropertyCard}
+        keyExtractor={(item) => item.id}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={height - 110}
+        snapToAlignment="start"
+      />
+
+      {/* Bottom Navigation Bar */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity onPress={() => setActiveTab('Home')}>
+          <Text style={[styles.navIcon, activeTab === 'Home' && styles.activeNav]}>🏠</Text>
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setActiveTab('Search')}>
+          <Text style={[styles.navIcon, activeTab === 'Search' && styles.activeNav]}>🔍</Text>
+          <Text style={styles.navLabel}>Search</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.addPropertyBtn} onPress={() => handleAction('Add Property', 'Upload Screen')}>
+          <Text style={styles.addPropertyText}>+</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setActiveTab('Saved')}>
+          <Text style={[styles.navIcon, activeTab === 'Saved' && styles.activeNav]}>🔖</Text>
+          <Text style={styles.navLabel}>Saved</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setActiveTab('Profile')}>
+          <Text style={[styles.navIcon, activeTab === 'Profile' && styles.activeNav]}>👤</Text>
+          <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -19,34 +180,164 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  card: {
+  header: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    color: '#007aff',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  topTabs: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  topTabText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  activeTopTab: {
+    color: '#fff',
+    borderBottomWidth: 2,
+    borderBottomColor: '#007aff',
+  },
+  cardContainer: {
+    width: width,
+    height: height - 110,
+    justifyContent: 'flex-end',
+  },
+  propertyImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: width,
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  rightBar: {
+    position: 'absolute',
+    right: 15,
+    bottom: 120,
+    alignItems: 'center',
+    gap: 18,
+  },
+  actionButton: {
+    alignItems: 'center',
+  },
+  actionIcon: {
+    fontSize: 28,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  bottomInfo: {
     padding: 20,
-    backgroundColor: '#1c1c1e',
-    borderRadius: 12,
-    alignItems: 'center',
+    paddingBottom: 30,
+    width: width - 80,
   },
-  title: {
+  badge: {
+    backgroundColor: '#007aff',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  price: {
+    color: '#4cd964',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#4cd964',
+  title: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginVertical: 4,
+  },
+  location: {
+    color: '#ccc',
+    fontSize: 14,
+  },
+  featuresRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginVertical: 10,
   },
-  button: {
+  featureChip: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    fontSize: 12,
+  },
+  detailsButton: {
     backgroundColor: '#007aff',
-    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    marginTop: 10,
+    alignItems: 'center',
+    marginTop: 5,
   },
-  buttonText: {
+  detailsButtonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  bottomNav: {
+    height: 60,
+    backgroundColor: '#111',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    borderTopWidth: 0.5,
+    borderTopColor: '#333',
+  },
+  navIcon: {
+    fontSize: 20,
+    textAlign: 'center',
+    opacity: 0.6,
+  },
+  activeNav: {
+    opacity: 1,
+  },
+  navLabel: {
+    color: '#fff',
+    fontSize: 10,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  addPropertyBtn: {
+    backgroundColor: '#007aff',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPropertyText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: -2,
   },
 });
